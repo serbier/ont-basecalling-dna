@@ -1,0 +1,57 @@
+# Main entrypoint of the workflow. 
+# Please follow the best practices: 
+# https://snakemake.readthedocs.io/en/stable/snakefiles/best_practices.html,
+# in particular regarding the standardized folder structure mentioned there. 
+from datetime import datetime
+
+
+
+start_time = datetime.now()
+
+
+print(start_time)
+# snakemake configuration
+configfile: "config/config.yaml"
+
+
+
+# scan working directory
+def get_dir_files(base_dir):
+    return set({os.path.join(path, name) for path, subdirs, files in os.walk(base_dir) for name in files if not '/.' in path})
+
+start_files = get_dir_files(workflow.workdir_init)
+
+# names for multi-run rules
+runnames = []
+if os.path.isfile('runnames.txt'):
+    runnames = [line.rstrip(' /\n') for line in open('runnames.txt') if line.rstrip() and not line.startswith('#')]
+config['run_names'] = runnames
+
+
+# check raw data archive
+if not os.path.exists(config['storage_data_raw']):
+    raise RuntimeError("[ERROR] Raw data archive not found.")
+else:
+    config['storage_data_raw'] = config['storage_data_raw'].rstrip(' /')
+    for run_name in config['run_names']:
+        loc = os.path.join(config['storage_data_raw'], run_name)
+        if not os.path.exists(loc):
+            print_("[WARNING] {run_name} not found at {loc} and is not available in the workflow.".format(
+                run_name=run_name, loc=loc), file=sys.stderr)
+        elif not os.path.exists(os.path.join(loc, 'reads')) or not os.listdir(os.path.join(loc, 'reads')):
+            print_("[WARNING] {run_name} configured but with missing/empty reads directory.".format(
+                run_name=run_name), file=sys.stderr)
+
+
+# barcode mappings
+barcodes = {}
+if os.path.isfile('barcodes.yaml'):
+    with open("barcodes.yaml", 'r') as fp:
+        barcode_map = yaml.safe_load(fp)
+        barcodes = barcode_map
+config['barcodes'] = barcodes
+
+
+
+
+include : "storage.smk"

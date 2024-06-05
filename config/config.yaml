@@ -1,0 +1,3 @@
+# Raw sequencing data parent directory containing one folder per flow cell
+storage_data_raw : data/
+
